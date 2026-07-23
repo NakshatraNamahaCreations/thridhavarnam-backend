@@ -139,6 +139,60 @@ const Order = mongoose.model(
       status: { type: String, default: 'pending' },
       payment: { type: String, default: 'pending' },
       date: String,
+
+      // Full storefront-order payload — populated when the order comes
+      // from the checkout popup (POST /api/storefront/orders). The admin
+      // Orders table still reads the flat summary fields above; these
+      // extras drive Shiprocket + the customer-facing order detail page.
+      email: String,
+      phone: String,
+      address: {
+        line1: String,
+        line2: String,
+        city: String,
+        state: String,
+        pincode: String,
+        country: { type: String, default: 'India' },
+        _id: false,
+      },
+      lineItems: {
+        type: [
+          {
+            productId: String,
+            name: String,
+            sku: String,
+            qty: Number,
+            unitPrice: Number,
+            _id: false,
+          },
+        ],
+        default: [],
+      },
+      payMethod: String,       // 'upi' | 'card' | 'netbanking' | 'cod'
+      shipMethod: String,      // 'standard' | 'express'
+      promoCode: String,
+      subtotal: Number,
+      discount: Number,
+      shippingFee: Number,
+      codFee: Number,
+      tax: Number,
+      total: Number,
+      razorpay: {
+        orderId: String,
+        paymentId: String,
+        signature: String,
+        _id: false,
+      },
+      shiprocket: {
+        orderId: String,       // Shiprocket order_id (numeric)
+        shipmentId: String,    // Shiprocket shipment_id
+        awbCode: String,       // AWB assigned after courier is picked
+        courier: String,
+        status: String,        // 'created' | 'failed' | 'pending'
+        error: String,         // last error message if push failed
+        pushedAt: Date,
+        _id: false,
+      },
     },
     opts
   )
