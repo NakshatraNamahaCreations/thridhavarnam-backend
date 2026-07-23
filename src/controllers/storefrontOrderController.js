@@ -1,4 +1,4 @@
-const { Order, Payment, Customer } = require('../models')
+const { Order, Payment, Customer, Product } = require('../models')
 const { nextId, initials, today } = require('../utils/genId')
 const { createShiprocketOrder } = require('../services/shiprocket')
 
@@ -65,6 +65,33 @@ exports.place = async (req, res) => {
     total: Number(d.total) || 0,
     razorpay: d.razorpay || undefined,
   })
+
+  // Decrement inventory + bump the sold counter for every line item.
+  // Runs per-item (not one big $inc) so we can flip status='out_of_stock'
+  // when the running stock hits zero. Best-effort — a failure here
+  // doesn't undo the order (that already happened + the customer paid).
+  for (const it of items) {
+    const productId = String(it.productId || '').trim()
+    const qty = Math.max(1, Number(it.qty) || 1)
+    if (!productId) continue
+    try {
+      const updated = await Product.findOneAndUpdate(
+        { id: productId },
+        { $inc: { stock: -qty, sold: qty } },
+        { new: true },
+      )
+      if (updated && typeof updated.stock === 'number' && updated.stock <= 0) {
+        // Clamp negative stock (oversell) to 0 and mark out-of-stock so
+        // the storefront card shows the right ribbon on next fetch.
+        await Product.updateOne(
+          { id: productId },
+          { $set: { stock: Math.max(0, updated.stock), status: 'out_of_stock' } },
+        )
+      }
+    } catch (e) {
+      console.warn('[storefront-order] stock update failed for', productId, e.message)
+    }
+  }
 
   // Mirror the paid state into the Payments ledger so the admin
   // Payments page stays consistent.
