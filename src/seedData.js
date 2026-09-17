@@ -60,9 +60,9 @@ const buildPayments = () =>
   }))
 
 const adminUser = {
-  name: 'Riya Verma',
-  email: 'riya@vastrasarees.in',
-  password: 'password',
+  name: 'Thridhavarnam Admin',
+  email: 'admin@thridhavarnam.com',
+  password: 'admin@123',
   role: 'Store Admin',
 }
 
