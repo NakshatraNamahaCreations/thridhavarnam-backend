@@ -17,6 +17,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'vastra-crm-
 app.use('/api/auth', require('./routes/authRoutes'))
 app.use('/api/products', require('./routes/productRoutes'))
 app.use('/api/customers', require('./routes/customerRoutes'))
+app.use('/api/enquiries', require('./routes/enquiryRoutes'))
 app.use('/api/categories', require('./routes/categoryRoutes'))
 app.use('/api/occasions', require('./routes/occasionRoutes'))
 app.use('/api/colorways', require('./routes/colorwayRoutes'))
