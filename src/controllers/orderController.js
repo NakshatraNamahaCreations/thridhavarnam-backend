@@ -7,7 +7,7 @@ exports.list = async (_req, res) => {
 
 exports.create = async (req, res) => {
   const d = req.body
-  const id = await nextId(Order, '#ORD-')
+  const id = await nextId(Order, 'ORD-')
   const customer = String(d.customer || '').trim()
 
   const order = await Order.create({

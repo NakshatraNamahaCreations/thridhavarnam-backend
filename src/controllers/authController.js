@@ -13,6 +13,7 @@ const sanitize = (u) => ({
   lastName: u.lastName,
   mobile: u.mobile,
   dob: u.dob,
+  avatar: u.avatar || '',
 })
 
 exports.register = async (req, res) => {
@@ -54,4 +55,21 @@ exports.login = async (req, res) => {
 
 exports.me = async (req, res) => {
   res.json(sanitize(req.user))
+}
+
+// PATCH /api/auth/me — update the authenticated user's profile. Only
+// whitelisted fields are writable; email and password go through their
+// own dedicated endpoints so they can enforce the extra validation
+// those changes need.
+const PROFILE_WRITABLE = ['name', 'firstName', 'lastName', 'mobile', 'dob', 'avatar']
+exports.updateMe = async (req, res) => {
+  const patch = {}
+  for (const key of PROFILE_WRITABLE) {
+    if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+      patch[key] = req.body[key]
+    }
+  }
+  const user = await User.findByIdAndUpdate(req.user._id, patch, { new: true })
+  if (!user) return res.status(404).json({ message: 'User not found' })
+  res.json(sanitize(user))
 }

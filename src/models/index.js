@@ -125,6 +125,49 @@ const Occasion = mongoose.model(
   )
 )
 
+// Product review — left by a shopper on a product detail page. `name`
+// is the reviewer's display name (not tied to any user account), and
+// `comment` is optional so star-only reviews are valid.
+const Review = mongoose.model(
+  'Review',
+  new mongoose.Schema(
+    {
+      id: { type: String, unique: true, index: true },
+      productId: { type: String, index: true },
+      name: String,
+      rating: { type: Number, min: 1, max: 5 },
+      comment: String,
+    },
+    opts
+  )
+)
+
+// Heritage Story — one entry per weave shown on the storefront intro
+// scroll (HeritageScroll.tsx). All copy fields are admin-editable so
+// the marketing team can refresh imagery / narrative without a code
+// change. `order` controls the display sequence (ascending).
+const Story = mongoose.model(
+  'Story',
+  new mongoose.Schema(
+    {
+      id: { type: String, unique: true, index: true },
+      name: String,          // 'Kanjeevaram'
+      region: String,        // 'Kanchipuram'
+      state: String,         // 'Tamil Nadu'
+      era: String,           // 'since the Chola dynasty · 9th century'
+      image: String,         // Cloudinary URL
+      palette: { type: [String], default: [] }, // three hex colours
+      intro: String,         // one-line hook
+      origins: String,       // paragraph
+      technique: String,     // paragraph
+      look_for: { type: [String], default: [] }, // three authentication bullets
+      pull_quote: String,    // one-line pull quote
+      order: { type: Number, default: 0 },
+    },
+    opts
+  )
+)
+
 const Order = mongoose.model(
   'Order',
   new mongoose.Schema(
@@ -168,13 +211,12 @@ const Order = mongoose.model(
         ],
         default: [],
       },
-      payMethod: String,       // 'upi' | 'card' | 'netbanking' | 'cod'
+      payMethod: String,       // 'upi' | 'card' | 'netbanking'
       shipMethod: String,      // 'standard' | 'express'
       promoCode: String,
       subtotal: Number,
       discount: Number,
       shippingFee: Number,
-      codFee: Number,
       tax: Number,
       total: Number,
       razorpay: {
@@ -238,4 +280,4 @@ const Coupon = mongoose.model(
   )
 )
 
-module.exports = { Product, Customer, Category, Occasion, Order, Payment, Coupon }
+module.exports = { Product, Customer, Category, Occasion, Story, Review, Order, Payment, Coupon }

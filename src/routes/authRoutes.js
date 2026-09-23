@@ -6,5 +6,6 @@ const c = require('../controllers/authController')
 router.post('/register', ah(c.register))
 router.post('/login', ah(c.login))
 router.get('/me', auth, ah(c.me))
+router.patch('/me', auth, ah(c.updateMe))
 
 module.exports = router

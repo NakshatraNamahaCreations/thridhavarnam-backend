@@ -3,15 +3,14 @@ const { nextId, initials, today } = require('../utils/genId')
 const { createShiprocketOrder } = require('../services/shiprocket')
 
 // POST /api/storefront/orders — public endpoint hit by the checkout
-// popup AFTER a successful Razorpay verification (or immediately for
-// COD). Persists the order + payment, then fires off to Shiprocket.
-// Shiprocket failures do NOT fail the whole request — the merchant
-// can retry from the admin panel.
+// popup AFTER a successful Razorpay verification. Persists the order
+// + payment, then fires off to Shiprocket. Shiprocket failures do NOT
+// fail the whole request — the merchant can retry from the admin panel.
 exports.place = async (req, res) => {
   const d = req.body || {}
 
   const clientOrderId = String(d.id || '').trim()
-  const id = clientOrderId || (await nextId(Order, '#ORD-'))
+  const id = clientOrderId || (await nextId(Order, 'ORD-'))
   const customer = String(d.customer || '').trim()
   const address = d.address || {}
   const items = Array.isArray(d.lineItems) ? d.lineItems : []
@@ -60,7 +59,6 @@ exports.place = async (req, res) => {
     subtotal: Number(d.subtotal) || 0,
     discount: Number(d.discount) || 0,
     shippingFee: Number(d.shippingFee) || 0,
-    codFee: Number(d.codFee) || 0,
     tax: Number(d.tax) || 0,
     total: Number(d.total) || 0,
     razorpay: d.razorpay || undefined,
@@ -102,7 +100,7 @@ exports.place = async (req, res) => {
       customer,
       avatar: orderDoc.avatar,
       amount: orderDoc.amount,
-      method: payMethod === 'cod' ? 'COD' : (payMethod || 'Razorpay').toUpperCase(),
+      method: (payMethod || 'Razorpay').toUpperCase(),
       status: 'paid',
       date: orderDoc.date,
     })

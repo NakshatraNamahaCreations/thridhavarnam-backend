@@ -91,7 +91,7 @@ function buildPayload(order) {
       units: Number(it.qty) || 1,
       selling_price: Number(it.unitPrice) || 0,
     })),
-    payment_method: order.payMethod === 'cod' ? 'COD' : 'Prepaid',
+    payment_method: 'Prepaid',
     shipping_charges: Number(order.shippingFee) || 0,
     total_discount: Number(order.discount) || 0,
     sub_total: Number(order.total) || Number(order.amount) || 0,

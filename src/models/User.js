@@ -11,6 +11,9 @@ const userSchema = new mongoose.Schema(
     lastName: String,
     mobile: String,
     dob: String, // ISO yyyy-mm-dd
+    // Cloudinary URL for the profile photo shown in the admin panel
+    // header + Settings > Profile. Empty string means "use initials".
+    avatar: { type: String, default: '' },
     role: { type: String, default: 'Customer' },
   },
   { timestamps: true }

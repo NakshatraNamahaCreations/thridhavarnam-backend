@@ -54,7 +54,7 @@ const buildPayments = () =>
     customer: o.customer,
     avatar: o.avatar,
     amount: o.amount,
-    method: o.payment === 'pending' ? '—' : ['UPI', 'Card', 'Net Banking', 'Wallet', 'COD'][i % 5],
+    method: o.payment === 'pending' ? '—' : ['UPI', 'Card', 'Net Banking', 'Wallet'][i % 4],
     status: o.payment,
     date: o.date,
   }))

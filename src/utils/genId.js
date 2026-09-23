@@ -1,4 +1,4 @@
-// Generate the next sequential id (e.g. SAR-1052, #ORD-9922) by scanning the
+// Generate the next sequential id (e.g. SAR-1052, ORD-9922) by scanning the
 // numeric portion of existing ids for a collection.
 async function nextId(Model, prefix, pad = 4) {
   const docs = await Model.find({}, 'id').lean()
