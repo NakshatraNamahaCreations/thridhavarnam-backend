@@ -108,6 +108,14 @@ const Category = mongoose.model(
       id: { type: String, unique: true, index: true },
       name: String,
       color: { type: String, default: 'maroon' },
+      // Storefront "Shop by weave" rail — Categories double as the weave
+      // list. `image` is the tile background (Cloudinary), `region` is the
+      // subtitle shown under the name ("Kanchipuram"), `order` controls
+      // display sequence (ascending), `active: false` hides the tile.
+      image: { type: String, default: '' },
+      region: { type: String, default: '' },
+      order: { type: Number, default: 0 },
+      active: { type: Boolean, default: true },
     },
     opts
   )
@@ -120,6 +128,9 @@ const Occasion = mongoose.model(
       id: { type: String, unique: true, index: true },
       name: String,
       color: { type: String, default: 'maroon' },
+      image: { type: String, default: '' },      // Cloudinary URL for the storefront tile
+      fromAmount: { type: Number, default: 0 },  // Range floor for the home tile ("₹X – ₹Y")
+      toAmount: { type: Number, default: 0 },    // Range ceiling; 0 means open-ended ("From ₹X")
     },
     opts
   )
@@ -137,6 +148,53 @@ const Review = mongoose.model(
       name: String,
       rating: { type: Number, min: 1, max: 5 },
       comment: String,
+    },
+    opts
+  )
+)
+
+// Home "Shop by price" tile — one entry per price bucket shown on the
+// storefront home page. Admin manages the image + label + subtitle +
+// href (arbitrary shop URL, e.g. /shop?bracket=under-5k) so marketing
+// can rotate seasonal messaging without a code change.
+const PriceBucket = mongoose.model(
+  'PriceBucket',
+  new mongoose.Schema(
+    {
+      id: { type: String, unique: true, index: true },
+      label: String,               // "Under ₹5,000"
+      subtitle: String,            // "Everyday Drapes"
+      image: String,               // Cloudinary URL
+      href: { type: String, default: '/shop' }, // Where the tile links
+      startingPrice: { type: Number, default: 0 }, // "Starting at ₹X"; 0 hides
+      order: { type: Number, default: 0 },
+      active: { type: Boolean, default: true },
+    },
+    opts
+  )
+)
+
+// Home hero banner — one entry per slide on the storefront Hero
+// carousel. `order` controls the rotation sequence (ascending). If any
+// banners exist the storefront renders them as slides in place of the
+// hard-coded product-driven fallback.
+const Banner = mongoose.model(
+  'Banner',
+  new mongoose.Schema(
+    {
+      id: { type: String, unique: true, index: true },
+      // Where the banner shows on the storefront:
+      //   'hero'  → rotating hero carousel on the home page (default)
+      //   'weave' → tile image for a specific weave in the Shop by weave rail
+      type: { type: String, default: 'hero' },
+      weave: { type: String, default: '' }, // Category name; used when type='weave'
+      title: String,       // headline shown over the image (hero)
+      subtitle: String,    // supporting copy below the headline (hero)
+      image: String,       // Cloudinary URL
+      ctaLabel: String,    // button text (hero)
+      ctaHref: String,     // URL the button links to (hero)
+      order: { type: Number, default: 0 },
+      active: { type: Boolean, default: true },
     },
     opts
   )
@@ -280,4 +338,4 @@ const Coupon = mongoose.model(
   )
 )
 
-module.exports = { Product, Customer, Category, Occasion, Story, Review, Order, Payment, Coupon }
+module.exports = { Product, Customer, Category, Occasion, Story, Review, Banner, PriceBucket, Order, Payment, Coupon }

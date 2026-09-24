@@ -12,7 +12,14 @@ exports.create = async (req, res) => {
   const exists = await Occasion.findOne({ id })
   if (exists) return res.status(409).json({ message: 'Occasion already exists' })
 
-  const occasion = await Occasion.create({ id, name, color: req.body.color || 'maroon' })
+  const occasion = await Occasion.create({
+    id,
+    name,
+    color: req.body.color || 'maroon',
+    image: req.body.image || '',
+    fromAmount: Number(req.body.fromAmount) || 0,
+    toAmount: Number(req.body.toAmount) || 0,
+  })
   res.status(201).json(occasion)
 }
 

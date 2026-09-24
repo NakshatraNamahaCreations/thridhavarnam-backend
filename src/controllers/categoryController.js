@@ -1,7 +1,9 @@
 const { Category } = require('../models')
 
 exports.list = async (_req, res) => {
-  res.json(await Category.find().sort({ createdAt: 1 }))
+  // Sort by admin-controlled order first, then creation time as a
+  // tiebreaker so newer rows without an explicit order still appear last.
+  res.json(await Category.find().sort({ order: 1, createdAt: 1 }))
 }
 
 exports.create = async (req, res) => {
@@ -12,7 +14,15 @@ exports.create = async (req, res) => {
   const exists = await Category.findOne({ id })
   if (exists) return res.status(409).json({ message: 'Category already exists' })
 
-  const category = await Category.create({ id, name, color: req.body.color || 'maroon' })
+  const category = await Category.create({
+    id,
+    name,
+    color: req.body.color || 'maroon',
+    image: req.body.image || '',
+    region: req.body.region || '',
+    order: Number(req.body.order) || 0,
+    active: req.body.active !== false,
+  })
   res.status(201).json(category)
 }
 
