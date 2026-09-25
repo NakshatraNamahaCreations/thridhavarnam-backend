@@ -54,12 +54,14 @@ exports.place = async (req, res) => {
       unitPrice: Number(it.unitPrice) || 0,
     })),
     payMethod,
-    shipMethod: String(d.shipMethod || 'standard'),
+    // MRP is inclusive of GST and shipping — never record either as an
+    // extra charge, even if a stale storefront build sends them.
+    shipMethod: 'standard',
     promoCode: d.promoCode || null,
     subtotal: Number(d.subtotal) || 0,
     discount: Number(d.discount) || 0,
-    shippingFee: Number(d.shippingFee) || 0,
-    tax: Number(d.tax) || 0,
+    shippingFee: 0,
+    tax: 0,
     total: Number(d.total) || 0,
     razorpay: d.razorpay || undefined,
   })
