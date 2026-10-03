@@ -81,7 +81,27 @@ function startServer() {
   app.disable('x-powered-by')
 
   app.use(compression()) // gzip all responses — biggest single bandwidth win
-  app.use(cors({ origin: true, credentials: true }))
+  // app.use(cors({ origin: true, credentials: true }))
+  const allowedOrigins = [
+  'https://admin.thridhavarnam.com',
+  'https://www.thridhavarnam.com',
+  'https://thridhavarnam.com'
+]
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error(`CORS blocked origin: ${origin}`))
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+)
   app.use(express.json({ limit: '12mb' })) // large limit so base64 saree images fit
   // Writing a log line for every successful request is a measurable cost at
   // thousands of requests per second. Outside --dev, log only failures, or

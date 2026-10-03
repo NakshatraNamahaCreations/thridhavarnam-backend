@@ -187,10 +187,13 @@ const Banner = mongoose.model(
     {
       id: { type: String, unique: true, index: true },
       // Where the banner shows on the storefront:
-      //   'hero'  → rotating hero carousel on the home page (default)
-      //   'weave' → tile image for a specific weave in the Shop by weave rail
+      //   'hero'     → rotating hero carousel on the home page (default)
+      //   'weave'    → tile image for a specific weave in the Shop by weave rail
+      //   'parallax' → mid-page Feature banner (ParallaxBanner.tsx)
       type: { type: String, default: 'hero' },
-      weave: { type: String, default: '' }, // Category name; used when type='weave'
+      // For type='weave' this is the category name. For type='parallax' it
+      // doubles as the eyebrow/chip label shown above the title.
+      weave: { type: String, default: '' },
       title: String,       // headline shown over the image (hero)
       subtitle: String,    // supporting copy below the headline (hero)
       image: String,       // Cloudinary URL
