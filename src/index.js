@@ -85,7 +85,9 @@ function startServer() {
   const allowedOrigins = [
   'https://admin.thridhavarnam.com',
   'https://www.thridhavarnam.com',
-  'https://thridhavarnam.com'
+  'https://thridhavarnam.com',
+  'http://localhost:3000',
+  'http://localhost:5173'
 ]
 
 app.use(
