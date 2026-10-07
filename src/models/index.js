@@ -299,6 +299,14 @@ const Order = mongoose.model(
         pushedAt: Date,
         _id: false,
       },
+
+      // True when this order has decremented Product.stock + bumped
+      // Product.sold for its lineItems. Flipped by the storefront
+      // checkout flow, cleared by orderController when the order is
+      // cancelled or deleted so inventory rolls back exactly once.
+      // Admin-created orders (no lineItems) never set this true, so
+      // their delete/cancel skips the rollback.
+      inventoryApplied: { type: Boolean, default: false },
     },
     opts
   )

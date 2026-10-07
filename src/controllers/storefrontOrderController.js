@@ -68,6 +68,7 @@ exports.place = async (req, res) => {
   // Runs per-item (not one big $inc) so we can flip status='out_of_stock'
   // when the running stock hits zero. Best-effort — a failure here
   // doesn't undo the order (that already happened + the customer paid).
+  let anyApplied = false
   for (const it of items) {
     const productId = String(it.productId || '').trim()
     const qty = Math.max(1, Number(it.qty) || 1)
@@ -78,17 +79,27 @@ exports.place = async (req, res) => {
         { $inc: { stock: -qty, sold: qty } },
         { new: true },
       )
-      if (updated && typeof updated.stock === 'number' && updated.stock <= 0) {
-        // Clamp negative stock (oversell) to 0 and mark out-of-stock so
-        // the storefront card shows the right ribbon on next fetch.
-        await Product.updateOne(
-          { id: productId },
-          { $set: { stock: Math.max(0, updated.stock), status: 'out_of_stock' } },
-        )
+      if (updated) {
+        anyApplied = true
+        if (typeof updated.stock === 'number' && updated.stock <= 0) {
+          // Clamp negative stock (oversell) to 0 and mark out-of-stock so
+          // the storefront card shows the right ribbon on next fetch.
+          await Product.updateOne(
+            { id: productId },
+            { $set: { stock: Math.max(0, updated.stock), status: 'out_of_stock' } },
+          )
+        }
       }
     } catch (e) {
       console.warn('[storefront-order] stock update failed for', productId, e.message)
     }
+  }
+
+  // Flip the rollback flag so a later cancel/delete can restore inventory
+  // exactly once. If every $inc failed above, leave it false so a retry
+  // from the admin side doesn't double-restock.
+  if (anyApplied) {
+    await Order.updateOne({ id: orderDoc.id }, { $set: { inventoryApplied: true } })
   }
 
   // Mirror the paid state into the Payments ledger so the admin
