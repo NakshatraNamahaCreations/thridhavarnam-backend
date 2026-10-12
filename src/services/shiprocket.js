@@ -201,4 +201,154 @@ async function createShiprocketOrder(order) {
   }
 }
 
-module.exports = { createShiprocketOrder, getToken }
+// In-memory tracking cache. Shiprocket statuses change on the order of
+// minutes/hours, not seconds, so a 60s TTL is plenty — and it protects
+// the admin orders page (which fetches tracking for every order in the
+// list on every poll) from hammering Shiprocket's rate-limited API.
+const TRACK_CACHE_TTL_MS = 60 * 1000
+const _trackCache = new Map() // key → { data, at }
+
+function _trackCacheKey({ awbCode, shipmentId }) {
+  return awbCode ? `awb:${awbCode}` : `ship:${shipmentId}`
+}
+
+// Fetch live tracking for a shipment. Prefers the AWB endpoint (richer
+// activity log once the courier has picked it up); falls back to the
+// shipment-id endpoint for the brief window between order creation and
+// AWB assignment. Returns a normalized shape the controller can hand
+// straight to the storefront — Shiprocket's own response is deeply
+// nested and slightly different between the two endpoints.
+async function trackShipment({ awbCode, shipmentId }) {
+  if (!awbCode && !shipmentId) {
+    const err = new Error('trackShipment needs awbCode or shipmentId')
+    err.status = 400
+    throw err
+  }
+
+  // Serve from the per-identifier cache if the entry is still warm.
+  // The admin orders page fans out a lot of parallel calls on every
+  // 60s poll, so this keeps us well under Shiprocket's rate limit.
+  const cacheKey = _trackCacheKey({ awbCode, shipmentId })
+  const cached = _trackCache.get(cacheKey)
+  if (cached && Date.now() - cached.at < TRACK_CACHE_TTL_MS) {
+    return cached.data
+  }
+
+  const path = awbCode
+    ? `/courier/track/awb/${encodeURIComponent(awbCode)}`
+    : `/courier/track/shipment/${encodeURIComponent(shipmentId)}`
+
+  const call = async (bearer) => {
+    const { data } = await axios.get(`${BASE}${path}`, {
+      headers: { Authorization: `Bearer ${bearer}` },
+    })
+    return data
+  }
+
+  let token = await getToken()
+  let data
+  try {
+    data = await call(token)
+  } catch (err) {
+    if (err.response?.status === 401) {
+      token = await getToken(true)
+      data = await call(token)
+    } else {
+      const status = err.response?.status
+      const body = err.response?.data
+      const detail = typeof body === 'string' ? body : JSON.stringify(body || {}).slice(0, 300)
+      const wrapped = new Error(`Shiprocket track ${status || 'error'}: ${detail || err.message}`)
+      wrapped.status = status || 500
+      throw wrapped
+    }
+  }
+
+  // Shiprocket responses:
+  //  - AWB endpoint:      { tracking_data: { track_status, shipment_status, shipment_track: [{current_status, courier_name, ...}], shipment_track_activities: [...] } }
+  //  - Shipment endpoint: { [shipmentId]: { tracking_data: { ... } } }  (keyed by shipment id)
+  // Normalise both into the same `tracking_data` object.
+  let td = data?.tracking_data
+  if (!td && shipmentId && data && typeof data === 'object') {
+    const keyed = data[shipmentId] || data[String(shipmentId)]
+    td = keyed?.tracking_data
+  }
+  td = td || {}
+
+  const trackHead = Array.isArray(td.shipment_track) && td.shipment_track[0] ? td.shipment_track[0] : {}
+  const activities = Array.isArray(td.shipment_track_activities) ? td.shipment_track_activities : []
+  // Only use the string status fields — `shipment_status` is a numeric
+  // Shiprocket-internal code and must NEVER be stringified for display
+  // (otherwise the UI renders a bare "8" instead of "Cancelled" etc.).
+  // Prefer the trackHead.current_status; fall back to the most recent
+  // activity's label; else leave empty so the caller's default
+  // ("Confirmed") kicks in.
+  let currentStatus = String(trackHead.current_status || '').trim()
+  if (!currentStatus && activities[0]) {
+    currentStatus = String(activities[0].status || activities[0]['sr-status-label'] || '').trim()
+  }
+
+  const result = {
+    awbCode: trackHead.awb_code || awbCode || '',
+    courier: trackHead.courier_name || '',
+    status: currentStatus,
+    etd: trackHead.edd || trackHead.expected_delivery_date || '',
+    activities: activities.map((a) => ({
+      date: a.date || a.updated_date || '',
+      status: String(a.status || a['sr-status-label'] || '').trim(),
+      activity: String(a.activity || '').trim(),
+      location: String(a.location || '').trim(),
+    })),
+    raw: td,
+  }
+
+  _trackCache.set(cacheKey, { data: result, at: Date.now() })
+  return result
+}
+
+// Cancel a Shiprocket order by its (numeric) order_id. Shiprocket's
+// cancel endpoint accepts a batch of ids; we send a single-element
+// array. Throws with a descriptive message on upstream failure — the
+// caller decides whether to surface or soft-fail that error, since
+// cancellation on our side should typically still succeed either way.
+async function cancelShiprocketOrder(shiprocketOrderId) {
+  if (!shiprocketOrderId) {
+    const err = new Error('cancelShiprocketOrder needs a shiprocketOrderId')
+    err.status = 400
+    throw err
+  }
+
+  const idForApi = Number(shiprocketOrderId) || String(shiprocketOrderId)
+  const body = { ids: [idForApi] }
+
+  const call = async (bearer) => {
+    const { data } = await axios.post(`${BASE}/orders/cancel`, body, {
+      headers: { Authorization: `Bearer ${bearer}` },
+    })
+    return data
+  }
+
+  let token = await getToken()
+  try {
+    const data = await call(token)
+    // Clear any cached tracking for shipments on this order so the next
+    // admin poll picks up the fresh "Cancelled" status instead of a
+    // stale "In Transit" from the 60s cache.
+    for (const key of _trackCache.keys()) _trackCache.delete(key)
+    return data
+  } catch (err) {
+    if (err.response?.status === 401) {
+      token = await getToken(true)
+      const data = await call(token)
+      for (const key of _trackCache.keys()) _trackCache.delete(key)
+      return data
+    }
+    const status = err.response?.status
+    const body = err.response?.data
+    const detail = typeof body === 'string' ? body : JSON.stringify(body || {}).slice(0, 300)
+    const wrapped = new Error(`Shiprocket cancel ${status || 'error'}: ${detail || err.message}`)
+    wrapped.status = status || 500
+    throw wrapped
+  }
+}
+
+module.exports = { createShiprocketOrder, trackShipment, cancelShiprocketOrder, getToken }

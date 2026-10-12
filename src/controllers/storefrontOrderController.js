@@ -1,6 +1,31 @@
 const { Order, Payment, Customer, Product } = require('../models')
 const { nextId, initials, today } = require('../utils/genId')
-const { createShiprocketOrder } = require('../services/shiprocket')
+const { createShiprocketOrder, trackShipment } = require('../services/shiprocket')
+
+// Map a free-form Shiprocket status string to our 5-step tracker index.
+// Returns -1 for cancelled/RTO so the UI can render a cancelled badge
+// instead of a progress dot.
+function mapShiprocketStatusToStep(statusRaw) {
+  const s = String(statusRaw || '').toLowerCase()
+  if (!s) return 0
+  if (s.includes('cancel')) return -1
+  if (s.includes('rto')) return -1
+  if (s.includes('delivered')) return 4
+  if (s.includes('out for delivery') || s.includes('out_for_delivery')) return 3
+  if (s.includes('transit') || s.includes('shipped') || s.includes('reached')) return 2
+  if (
+    s.includes('pickup') ||
+    s.includes('manifest') ||
+    s.includes('packed') ||
+    s.includes('label') ||
+    s.includes('awb assigned')
+  ) {
+    return 1
+  }
+  // New / confirmed / ready to ship — order sits at step 0 until Shiprocket
+  // actually scans it in.
+  return 0
+}
 
 // POST /api/storefront/orders — public endpoint hit by the checkout
 // popup AFTER a successful Razorpay verification. Persists the order
@@ -189,4 +214,75 @@ exports.place = async (req, res) => {
     payment: orderDoc.payment,
     shiprocket: shiprocketResult,
   })
+}
+
+// GET /api/storefront/orders/:id/tracking — public endpoint hit by the
+// thank-you / orders pages to render a live tracker. We purposefully
+// NEVER return 404 for an unknown id or a shipment-not-yet-indexed
+// state: the storefront should degrade to its time-based estimate
+// instead of erroring out. On an upstream Shiprocket failure we return
+// 200 with { ok: false } + whatever metadata we have, same reason.
+exports.track = async (req, res) => {
+  const id = String(req.params.id || '').trim()
+  if (!id) return res.status(400).json({ ok: false, error: 'order id required' })
+
+  const order = await Order.findOne({ id }).lean()
+  if (!order) {
+    return res.json({ ok: false, reason: 'order_not_found', orderId: id })
+  }
+
+  const sr = order.shiprocket || {}
+  const base = {
+    ok: true,
+    orderId: order.id,
+    createdAt: order.createdAt,
+    shipMethod: order.shipMethod || 'standard',
+    orderStatus: order.status || 'pending',
+    shiprocket: {
+      orderId: sr.orderId || '',
+      shipmentId: sr.shipmentId || '',
+      awbCode: sr.awbCode || '',
+      courier: sr.courier || '',
+      status: sr.status || '',
+      error: sr.error || '',
+    },
+  }
+
+  // Order was cancelled on our side (admin or storefront). Short-circuit.
+  if (order.status === 'cancelled') {
+    return res.json({ ...base, step: -1, currentStatus: 'Cancelled', activities: [] })
+  }
+
+  // No Shiprocket shipment yet (push failed or still pending). Return
+  // step 0 so the UI falls back to its time-based estimate.
+  if (!sr.awbCode && !sr.shipmentId) {
+    return res.json({
+      ...base,
+      step: 0,
+      currentStatus: sr.status === 'failed' ? 'Awaiting dispatch' : 'Confirmed',
+      activities: [],
+    })
+  }
+
+  try {
+    const tr = await trackShipment({ awbCode: sr.awbCode, shipmentId: sr.shipmentId })
+    const step = mapShiprocketStatusToStep(tr.status)
+    return res.json({
+      ...base,
+      step,
+      currentStatus: tr.status || 'Confirmed',
+      etd: tr.etd || '',
+      courier: tr.courier || sr.courier || '',
+      activities: tr.activities,
+    })
+  } catch (err) {
+    console.warn('[tracking] shiprocket track failed for', id, err.message)
+    return res.json({
+      ...base,
+      step: 0,
+      currentStatus: 'Confirmed',
+      activities: [],
+      upstreamError: err.message || 'shiprocket track failed',
+    })
+  }
 }

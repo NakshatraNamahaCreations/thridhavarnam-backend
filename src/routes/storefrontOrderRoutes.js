@@ -6,4 +6,8 @@ const c = require('../controllers/storefrontOrderController')
 // Razorpay signature verification.
 router.post('/', ah(c.place))
 
+// Public — the storefront thank-you / orders page polls this to drive
+// the live tracker. See controller for the response shape.
+router.get('/:id/tracking', ah(c.track))
+
 module.exports = router
