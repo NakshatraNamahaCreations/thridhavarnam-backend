@@ -270,6 +270,12 @@ const Order = mongoose.model(
             sku: String,
             qty: Number,
             unitPrice: Number,
+            // Captured at checkout so the storefront's "My orders" page
+            // can render the thumbnail + weave label without an extra
+            // round-trip to the products API (and so the data survives
+            // the product being renamed / re-imaged later).
+            weave: String,
+            image: String,
             _id: false,
           },
         ],
