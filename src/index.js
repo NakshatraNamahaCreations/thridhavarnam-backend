@@ -86,7 +86,7 @@ function startServer() {
   'https://admin.thridhavarnam.com',
   'https://www.thridhavarnam.com',
   'https://thridhavarnam.com',
-  'http://localhost:3000',
+  'http://localhost:3002',
   'http://localhost:5173'
 ]
 
@@ -146,7 +146,7 @@ app.use(
   app.use((req, res) => res.status(404).json({ message: `Route not found: ${req.method} ${req.path}` }))
   app.use(errorHandler)
 
-  const PORT = process.env.PORT || 5000
+  const PORT = process.env.PORT || 5001
   const isFirstWorker = (process.env.WORKER_INDEX || '0') === '0'
 
   connectDB()

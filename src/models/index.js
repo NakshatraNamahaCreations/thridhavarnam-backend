@@ -158,8 +158,9 @@ const Review = mongoose.model(
 
 // Home "Shop by price" tile — one entry per price bucket shown on the
 // storefront home page. Admin manages the image + label + subtitle +
-// href (arbitrary shop URL, e.g. /shop?bracket=under-5k) so marketing
-// can rotate seasonal messaging without a code change.
+// min/max price so the storefront filter matches the tile label
+// exactly (and keeps matching when the admin changes the numbers).
+// The tile href is derived from min/max on the storefront side.
 const PriceBucket = mongoose.model(
   'PriceBucket',
   new mongoose.Schema(
@@ -168,7 +169,11 @@ const PriceBucket = mongoose.model(
       label: String,               // "Under ₹5,000"
       subtitle: String,            // "Everyday Drapes"
       image: String,               // Cloudinary URL
-      href: { type: String, default: '/shop' }, // Where the tile links
+      // Price range the tile filters by. 0 (or absent) on either side
+      // means "unbounded on that side": minPrice=0 → from zero;
+      // maxPrice=0 → no upper limit.
+      minPrice: { type: Number, default: 0 },
+      maxPrice: { type: Number, default: 0 },
       startingPrice: { type: Number, default: 0 }, // "Starting at ₹X"; 0 hides
       order: { type: Number, default: 0 },
       active: { type: Boolean, default: true },
